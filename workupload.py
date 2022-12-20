@@ -7,7 +7,8 @@ import json
 if len(sys.argv) < 2:
     print("Usage: workupload.py '>>workupload link<<'")
     sys.exit(1)
-logging.basicConfig()
+logging.root.setLevel(logging.NOTSET)
+
 
 link = sys.argv[1]
 
