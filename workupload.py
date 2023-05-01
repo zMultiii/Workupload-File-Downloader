@@ -75,6 +75,7 @@ progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True)
 with open(filename, "wb") as f:
     for chunk in response.iter_content(chunk_size=1024):
         if chunk:  # filter out keep-alive new chunks
+            progress_bar.update(len(chunk))
             f.write(chunk)
 
 # Close stream
@@ -83,4 +84,3 @@ progress_bar.close()
 # Send message if downloaded size doesn't match file's size
 if total_size != 0 and progress_bar.n != total_size:
     logging.error(f'Download incomplete!')
-    
