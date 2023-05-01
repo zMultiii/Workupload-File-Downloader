@@ -4,6 +4,8 @@ import re
 import requests
 import json
 
+from tqdm import tqdm
+
 if len(sys.argv) < 2:
     print("Usage: workupload.py '>>workupload link<<'")
     sys.exit(1)
@@ -63,8 +65,22 @@ else:
     filename = "default"
     logging.warning(f'Could not find any filename, using default as filename..')
 
+# Get file's size
+total_size = int(response.headers.get('Content-Length', 0))
+
+# Initialize progress bar
+progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True)
+
 # Save the file to the current directory
 with open(filename, "wb") as f:
     for chunk in response.iter_content(chunk_size=1024):
         if chunk:  # filter out keep-alive new chunks
             f.write(chunk)
+
+# Close stream
+progress_bar.close()
+
+# Send message if downloaded size doesn't match file's size
+if total_size != 0 and progress_bar.n != total_size:
+    logging.error(f'Download incomplete!')
+    
