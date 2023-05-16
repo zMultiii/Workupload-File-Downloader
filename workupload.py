@@ -1,70 +1,95 @@
 import logging
-import sys
-import re
-import requests
-import json
+from tqdm import tqdm
+from sys import argv, exit
+from re import sub, search
+from json import loads
+from requests import get, Response
 
-if len(sys.argv) < 2:
-    print("Usage: workupload.py '>>workupload link<<'")
-    sys.exit(1)
+logging.root.name = "downloader"
 logging.root.setLevel(logging.NOTSET)
 
+valid_url = r'.*workupload.com/'
+report_url = "https://github.com/knighthat/WorkuploadDownloader/issues"
 
-link = sys.argv[1]
 
-# Extract the type and id from the link
-id_string = re.sub(r'.*workupload.com/', '', link)
-type = id_string.split('/')[0]
-id = id_string.split('/')[1]
+def extract(url: str) -> dict:
+    uri = sub(valid_url, '', url).split('/')
 
-# Check if the link is a valid WorkUpload link
-if type not in ['file', 'archive']:
-    logging.critical('Invalid WorkUpload-Link, check your link and try again')
-    sys.exit(1)
+    logging.info(f"Download type: {uri[0]}")
+    logging.info(f"File's id: {uri[1]}")
 
-# Set the start URL based on the link type
-if type == 'file':
-    start_url = f'https://workupload.com/start/{id}'
-elif type == 'archive':
-    start_url = f'https://workupload.com/archive/{id}/start'
+    return {
+        'type': uri[0],
+        'id': uri[1]
+    }
 
-# Log a message indicating that we are getting the token
-logging.info('Getting token...')
 
-# Make a request to the link to get the token cookie
-response = requests.get(link, cookies=dict(token=''))
-cookies = response.cookies
-token = cookies['token']
+def get_token(url: str) -> str:
+    print(" ")
+    logging.info("Getting token...")
+    token = get(url, cookies=dict(token='')).cookies['token']
+    logging.info(f"Your temporary token: {token}")
+    return token
 
-# Log a message indicating that we have the token
-logging.info(f'Token : {token}, getting DownloadURL....')
 
-# Set the URL for the API call to get the download server
-api_url = f'https://workupload.com/api/{type}/getDownloadServer/{id}'
-headers = {'Cookie': f'token={token}'}
+def get_download_url(parts: dict, headers: dict) -> str:
+    print(" ")
+    logging.info(f"Requesting download URL...")
+    api_url = f"https://workupload.com/api/{parts['type']}/getDownloadServer/{parts['id']}"
 
-# Make a request to the API to get the download server
-response = requests.get(api_url, headers=headers)
-data = json.loads(response.text)
-dl_url = data['data']['url']
+    data_response = get(api_url, headers=headers)
+    dl_url = loads(data_response.text)['data']['url']
 
-# Make a request to the download server to get the file
-response = requests.get(dl_url, headers=headers, stream=True)
-response.raise_for_status()
+    logging.info(f"Downloading from {dl_url}")
+    return dl_url
 
-# Get the filename from the response headers
-filename = response.headers.get("Content-Disposition")
 
-# If the filename was not found, use a default value
-if filename:
-    filename = re.search(r'filename="(.+)"', filename).group(1)
-    logging.info(f'Downloading {filename}')
-else:
-    filename = "default"
-    logging.warning(f'Could not find any filename, using default as filename..')
+def get_file_information(url: str, headers: dict) -> dict:
+    print(" ")
+    logging.info("Searching file...")
+    file_response = get(url, headers=headers, stream=True)
 
-# Save the file to the current directory
-with open(filename, "wb") as f:
-    for chunk in response.iter_content(chunk_size=1024):
-        if chunk:  # filter out keep-alive new chunks
-            f.write(chunk)
+    name = file_response.headers.get('Content-Disposition')
+    name = search(r'filename="(.+)"', name).group(1)
+
+    size = file_response.headers.get('Content-Length', 0)
+
+    logging.info(f"File's name: {name}")
+    logging.info(f"File's size: {size}")
+    return {
+        'name': name,
+        'size': int(size),
+        'response': file_response
+    }
+
+
+def download(name: str, size: int, response: Response) -> None:
+    print(f"Downloading {name}...")
+    progress_bar = tqdm(total=size, unit='iB', unit_scale=True)
+
+    with open(name, 'wb') as file:
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                progress_bar.update(len(chunk))
+                file.write(chunk)
+
+    progress_bar.close()
+    if size != 0 and progress_bar.n != size:
+        logging.error(f"Error occurs during download. Report at \n {report_url}")
+
+
+if __name__ == '__main__':
+    if len(argv) < 2:
+        logging.fatal("Usage: python main.py <url>")
+        exit(1)
+
+    link = argv[1]
+    parts = extract(link)
+    token = get_token(link)
+
+    headers = {'Cookie': f'token={token}'}
+    dl_url = get_download_url(parts, headers)
+
+    content = get_file_information(dl_url, headers)
+
+    download(content['name'], content['size'], content['response'])
