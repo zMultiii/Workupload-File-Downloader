@@ -1,10 +1,11 @@
 import log
-from re import sub, match
+from re import sub
+from urllib.parse import urlparse
 from requests import get
 from json import loads
 
 
-url_pattern = r'.*workupload.com'
+url_pattern = 'https://workupload.com'
 
 
 class Scout:
@@ -12,9 +13,8 @@ class Scout:
         self.url = url
         self.token = ''
         self.server = ''
-        self.isValid = match(url_pattern, url)
+        self.isValid = is_url_valid(url)
         if not self.isValid:
-            log.err(f'Invalid URL structure!')
             return
 
         log.info('Requesting download token from WorkUpload')
@@ -42,7 +42,7 @@ class Scout:
     def get_download_server(self) -> bool:
         headers = {'Cookie': f'token={self.token}'}
         uris = self._split_url()
-        address = f'https://workupload.com/api/{uris[0]}/getDownloadServer/{uris[1]}'
+        address = f'{url_pattern}/api/{uris[0]}/getDownloadServer/{uris[1]}'
 
         log.deb(f'Request link: {address}')
         log.deb(f'Request headers: {headers}')
@@ -56,9 +56,18 @@ class Scout:
         return bool(json['success'])
 
     def _split_url(self) -> list[str]:
-        uris = sub(f'{url_pattern}/', '', self.url).split('/')
+        uris = sub(f'{url_pattern}', '', self.url).split('/')
 
         log.deb(f'File\'s type: {uris[0]}')
         log.deb(f'File\'s id: {uris[1]}')
 
         return uris
+
+
+def is_url_valid(url: str) -> bool:
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.scheme])
+    except ValueError:
+        log.err(f'Invalid URL structure!')
+        return False
