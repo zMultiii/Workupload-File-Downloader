@@ -3,6 +3,7 @@ from re import sub
 from urllib.parse import urlparse
 from requests import get, Response
 from json import loads
+import checksum
 
 
 url_pattern = 'https://workupload.com'
@@ -22,6 +23,9 @@ class Scout:
         log.deb(f'Status: {self.response.status_code}')
         log.deb(f'Headers: {self.response.headers}')
         log.deb(f'Token: {self.gettoken()}')
+
+        log.deb(f'Scraping checksum...')
+        self.checksum = checksum.web(self.response)
 
         log.info("Requesting download server")
         if self.get_download_server():
