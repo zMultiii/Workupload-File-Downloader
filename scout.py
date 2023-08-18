@@ -1,7 +1,7 @@
 import log
 from re import sub
 from urllib.parse import urlparse
-from requests import get
+from requests import get, Response
 from json import loads
 
 
@@ -17,13 +17,11 @@ class Scout:
         if not self.isValid:
             return
 
-        log.info('Requesting download token from WorkUpload')
-        self.get_token()
-        if not self.token:
-            self.isValid = False
-            log.warn('Failed to retrieve token, please check download URL')
-            return
-        log.info('Token generated!')
+        log.info('Retrieving page\'s information...')
+        self.response = scout(self.url, {})
+        log.deb(f'Status: {self.response.status_code}')
+        log.deb(f'Headers: {self.response.headers}')
+        log.deb(f'Token: {self.gettoken()}')
 
         log.info("Requesting download server")
         if self.get_download_server():
@@ -32,22 +30,23 @@ class Scout:
             self.isValid = False
             log.err("Request failed, check log or report bug")
             return
-
         log.deb(f'Downloadable URL: {self.server}')
 
-    def get_token(self):
-        self.token = get(self.url, cookies=dict(token='')).cookies['token']
-        log.deb(f'Token: {self.token}')
+    def gettoken(self) -> str:
+        try:
+            return self.response.cookies['token']
+        except KeyError:
+            return ''
 
     def get_download_server(self) -> bool:
-        headers = {'Cookie': f'token={self.token}'}
+        headers = {'Cookie': f'token={self.gettoken()}'}
         uris = self._split_url()
         address = f'{url_pattern}/api/{uris[0]}/getDownloadServer/{uris[1]}'
 
         log.deb(f'Request link: {address}')
         log.deb(f'Request headers: {headers}')
 
-        response = get(address, headers=headers).text
+        response = scout(address, headers).text
         log.deb(f'From server: {response}')
 
         json = loads(response)
@@ -56,7 +55,7 @@ class Scout:
         return bool(json['success'])
 
     def _split_url(self) -> list[str]:
-        uris = sub(f'{url_pattern}', '', self.url).split('/')
+        uris = sub(f'{url_pattern}/', '', self.url).split('/')
 
         log.deb(f'File\'s type: {uris[0]}')
         log.deb(f'File\'s id: {uris[1]}')
@@ -71,3 +70,7 @@ def is_url_valid(url: str) -> bool:
     except ValueError:
         log.err(f'Invalid URL structure!')
         return False
+
+
+def scout(url: str, headers: dict[str, str]) -> Response:
+    return get(url, headers=headers)
