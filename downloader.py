@@ -55,6 +55,8 @@ def start(file: File):
 
     if progress_bar.n != file.size:
         log.warn('Download is NOT complete, check log or report bug')
+    else:
+        log.info('Downloaded successfully!')
 
 
 def _prepare():
