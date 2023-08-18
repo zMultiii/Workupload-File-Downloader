@@ -3,6 +3,7 @@ import log
 from pathlib import PurePath, Path
 import scout
 import downloader
+import checksum
 
 url = ""
 destination = Path('./downloads')
@@ -63,9 +64,19 @@ if __name__ == "__main__":
             log.end_of_line()
             sys.exit(1)
 
-        file = downloader.File(scout.server, scout.token)
+        file = downloader.File(scout.server, scout.gettoken())
         downloader.start(file)
-        file.move(destination)
+
+        # Get SHA256 of downloaded file
+        calculated_hash = checksum.file(file.tempf)
+
+        # Compared calculated SHA256 to the one pulled from web
+        if checksum.compare(scout.checksum, calculated_hash):
+            file.move(destination)
+        else:
+            log.warn(f'File downloaded to {file.tempf} and')
+            log.warn(f'was NOT moved to {destination}')
+
         log.end_of_line()
     except Exception as e:
         log.ex(e)
