@@ -7,7 +7,7 @@ Simple Python script for downloading files on WorkUpload at better speed. Forked
 
 # Installation
 - Clone the repository `git clone --depth 1 https://github.com/knighthat/WorkuploadDownloader`
-- Install dependencies `pip install requirements.txt` 
+- Install dependencies `pip install -r requirements.txt` 
 
 # Usage
 > `workupload.py <url> [-o output]`
