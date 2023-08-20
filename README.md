@@ -21,9 +21,6 @@ This project is open to public and anyone can contribute and be a part of it at 
 - Be sure to write clear and concise code and documentation.
 - If you're adding new features ormake significant changes, consider adding relevant tests.
 - If you're fixing a bug, please provide steps to reproduce the issue if applicable.
-## Code of Conduct
-Help us maintain a welcoming and inclusive community.<br>
-By contributing to this project, you agree to abide by the [MIT LICENSE](https://github.com/knighthat/WorkuploadDownloader/blob/main/LICENSE)
 
 # License 
 You are free to obtain, make changes, or even distribute commercially without restrictions.<br>
