@@ -1,3 +1,11 @@
+<p align="center">
+  <b>
+    NOTE: THIS REPO IS CLOSED FOR FURTHER UPDATES DUE TO NEW UPDATE OF WORKUPLOAD MADE THE DOWNLOAD SPEED FROM WEBSITE FASTER
+  </b>
+</p>
+
+---
+
 Simple Python script for downloading files on WorkUpload at better speed. Forked from [zMultiii](https://github.com/zMultiii/Workupload-File-Downloader)
 
 # Features
@@ -11,7 +19,7 @@ Simple Python script for downloading files on WorkUpload at better speed. Forked
 
 # Usage
 > `workupload.py <url> [-o output]`
-- **\<url\>** : Link of workupload. Should be ****workupload.com/file/[id]***
+- **\<url\>** : Link of workupload. Should be ***workupload.com/file/[id]***
 - **-o**: Where file will be copied to once download is complete & hash is verified
 
 # Contribute
