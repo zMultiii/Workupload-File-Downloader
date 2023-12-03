@@ -1,95 +1,84 @@
-import logging
-from tqdm import tqdm
-from sys import argv, exit
-from re import sub, search
-from json import loads
-from requests import get, Response
+import sys
+import log
+from pathlib import PurePath, Path
+import scout
+import downloader
+import checksum
 
-logging.root.name = "downloader"
-logging.root.setLevel(logging.NOTSET)
-
-valid_url = r'.*workupload.com/'
-report_url = "https://github.com/knighthat/WorkuploadDownloader/issues"
+url = ""
+destination = Path('./downloads')
 
 
-def extract(url: str) -> dict:
-    uri = sub(valid_url, '', url).split('/')
+def parse_argv(argv: list[str]):
+    global url
+    global destination
 
-    logging.info(f"Download type: {uri[0]}")
-    logging.info(f"File's id: {uri[1]}")
-
-    return {
-        'type': uri[0],
-        'id': uri[1]
-    }
-
-
-def get_token(url: str) -> str:
-    print(" ")
-    logging.info("Getting token...")
-    token = get(url, cookies=dict(token='')).cookies['token']
-    logging.info(f"Your temporary token: {token}")
-    return token
+    for i, arg in enumerate(argv):
+        if arg.startswith("https://workupload.com/") and not url:
+            url = arg
+        if arg == '-o':
+            if argv[i + 1]:
+                destination = Path(argv[i + 1]).expanduser()
 
 
-def get_download_url(parts: dict, headers: dict) -> str:
-    print(" ")
-    logging.info(f"Requesting download URL...")
-    api_url = f"https://workupload.com/api/{parts['type']}/getDownloadServer/{parts['id']}"
+def validate_args() -> bool:
+    global url
+    global destination
 
-    data_response = get(api_url, headers=headers)
-    dl_url = loads(data_response.text)['data']['url']
+    if not url.startswith('https://workupload.com/'):
+        log.err(f'{url} is not a valid WorkUpload URL')
+        return False
+    try:
+        PurePath(destination)
+    except (TypeError, ValueError):
+        log.warn(f'{destination} is not a valid path. ')
+        return False
 
-    logging.info(f"Downloading from {dl_url}")
-    return dl_url
-
-
-def get_file_information(url: str, headers: dict) -> dict:
-    print(" ")
-    logging.info("Searching file...")
-    file_response = get(url, headers=headers, stream=True)
-
-    name = file_response.headers.get('Content-Disposition')
-    name = search(r'filename="(.+)"', name).group(1)
-
-    size = file_response.headers.get('Content-Length', 0)
-
-    logging.info(f"File's name: {name}")
-    logging.info(f"File's size: {size}")
-    return {
-        'name': name,
-        'size': int(size),
-        'response': file_response
-    }
+    return True
 
 
-def download(name: str, size: int, response: Response) -> None:
-    print(f"Downloading {name}...")
-    progress_bar = tqdm(total=size, unit='iB', unit_scale=True)
-
-    with open(name, 'wb') as file:
-        for chunk in response.iter_content(chunk_size=1024):
-            if chunk:
-                progress_bar.update(len(chunk))
-                file.write(chunk)
-
-    progress_bar.close()
-    if size != 0 and progress_bar.n != size:
-        logging.error(f"Error occurs during download. Report at \n {report_url}")
+def print_man():
+    print("Download files from WorkUpload.com at faster speed")
+    print("\tUsage: workupload.py <url> [-o output]")
+    print("\t\t-o\t- File's destination (Default at location of workupload.py)")
 
 
-if __name__ == '__main__':
-    if len(argv) < 2:
-        logging.fatal("Usage: python main.py <url>")
-        exit(1)
+if __name__ == "__main__":
+    try:
+        if len(sys.argv) < 2:
+            log.err("Missing argument")
+            print_man()
+            log.end_of_line()
+            sys.exit(1)
 
-    link = argv[1]
-    parts = extract(link)
-    token = get_token(link)
+        parse_argv(sys.argv)
+        if not validate_args():
+            log.end_of_line()
+            sys.exit(1)
 
-    headers = {'Cookie': f'token={token}'}
-    dl_url = get_download_url(parts, headers)
+        log.deb(f'Target URL: {url}')
+        log.deb(f'Save to: {destination}')
 
-    content = get_file_information(dl_url, headers)
+        scout = scout.Scout(url)
+        if not scout.isValid:
+            log.end_of_line()
+            sys.exit(1)
 
-    download(content['name'], content['size'], content['response'])
+        file = downloader.File(scout.server, scout.gettoken())
+        downloader.start(file)
+
+        # Get SHA256 of downloaded file
+        calculated_hash = checksum.file(file.tempf)
+
+        # Compared calculated SHA256 to the one pulled from web
+        if checksum.compare(scout.checksum, calculated_hash):
+            file.move(destination)
+        else:
+            log.warn(f'File downloaded to {file.tempf} and')
+            log.warn(f'was NOT moved to {destination}')
+
+        log.end_of_line()
+    except Exception as e:
+        log.ex(e)
+        log.end_of_line()
+
